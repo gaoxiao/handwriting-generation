@@ -17,7 +17,7 @@ parser.add_argument('--style', dest='style', type=int, default=None)
 parser.add_argument('--bias', dest='bias', type=float, default=1.)
 parser.add_argument('--force', dest='force', action='store_true', default=False)
 parser.add_argument('--animation', dest='animation', action='store_true', default=False)
-parser.add_argument('--noinfo', dest='info', action='store_false', default=True)
+parser.add_argument('--noinfo', dest='info', action='store_false', default=False)
 parser.add_argument('--save', dest='save', type=str, default=None)
 args = parser.parse_args()
 
@@ -200,7 +200,7 @@ def main():
             else:
                 fig, ax = plt.subplots(1, 1)
                 for stroke in split_strokes(cumsum(np.array(coords))):
-                    plt.plot(stroke[:, 0], -stroke[:, 1])
+                    plt.plot(stroke[:, 0], -stroke[:, 1], 'r')
                 ax.set_title('Handwriting')
                 ax.set_aspect('equal')
                 plt.show()

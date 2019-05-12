@@ -1,11 +1,14 @@
 import argparse
 import os
 import pickle
+import random
+import uuid
 from collections import namedtuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', dest='model_path', type=str, default=os.path.join('pretrained', 'model-29'))
@@ -15,6 +18,7 @@ parser.add_argument('--bias', dest='bias', type=float, default=1.)
 parser.add_argument('--force', dest='force', action='store_true', default=False)
 parser.add_argument('--animation', dest='animation', action='store_true', default=False)
 parser.add_argument('--save', dest='save', type=str, default=None)
+parser.add_argument('--size', dest='size', type=int, default=100)
 args = parser.parse_args()
 
 
@@ -78,7 +82,7 @@ def sample_text(sess, args_text, translation, style=None):
     for s in range(1, 60 * sequence_len + 1):
         is_priming = s < prime_len
 
-        print('\r[{:5d}] sampling... {}'.format(s, 'priming' if is_priming else 'synthesis'), end='')
+        # print('\r[{:5d}] sampling... {}'.format(s, 'priming' if is_priming else 'synthesis'), end='')
 
         e, pi, mu1, mu2, std1, std2, rho, \
         finish, phi, window, kappa = sess.run([vs.e, vs.pi, vs.mu1, vs.mu2,
@@ -106,7 +110,7 @@ def sample_text(sess, args_text, translation, style=None):
             stroke_data += [[mu1[0, g], mu2[0, g], std1[0, g], std2[0, g], rho[0, g], coord[2]]]
 
             if not args.force and finish[0, 0] > 0.8:
-                print('\nFinished sampling!\n')
+                # print('\nFinished sampling!\n')
                 break
 
     coords = np.array(coords)
@@ -122,17 +126,20 @@ def main():
     charset = [rev_translation[i] for i in range(len(rev_translation))]
     charset[0] = ''
 
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.3)
     config = tf.ConfigProto(
-        device_count={'GPU': 0}
+        device_count={'GPU': 1},
+        gpu_options=gpu_options
     )
+
+    words = []
+    with open('google-10000-english-usa.txt') as f:
+        for l in f:
+            words.append(l.strip())
+
     with tf.Session(config=config) as sess:
         saver = tf.train.import_meta_graph(args.model_path + '.meta')
         saver.restore(sess, args.model_path)
-
-        if args.text is not None:
-            args_text = args.text
-        else:
-            args_text = input('What to generate: ')
 
         style = None
         if args.style is not None:
@@ -144,21 +151,50 @@ def main():
 
             style = [styles[0][args.style], styles[1][args.style]]
 
-        phi_data, window_data, kappa_data, stroke_data, coords = sample_text(sess, args_text, translation, style)
+        data_dir = 'gen'
 
-        strokes = np.array(stroke_data)
-        epsilon = 1e-8
-        strokes[:, :2] = np.cumsum(strokes[:, :2], axis=0)
-        minx, maxx = np.min(strokes[:, 0]), np.max(strokes[:, 0])
-        miny, maxy = np.min(strokes[:, 1]), np.max(strokes[:, 1])
+        if not os.path.isdir(data_dir):
+            os.makedirs(data_dir)
 
-        fig, ax = plt.subplots(1, 1)
-        for stroke in split_strokes(cumsum(np.array(coords))):
-            plt.plot(stroke[:, 0], -stroke[:, 1])
-        ax.set_title('Handwriting')
-        ax.set_aspect('equal')
-        plt.savefig('gen/test.png')
-        plt.show()
+        idx = 0
+        record_file = 'logs/{}.txt'.format(uuid.uuid4())
+
+        def write_record(record_list):
+            with open(record_file, 'a') as res:
+                for idx, word in record:
+                    res.write('{},{}\n'.format(idx, word))
+            del record_list[:]
+
+        record = []
+        size = args.size
+        with tqdm(total=size) as pbar:
+            while idx < size:
+                w1, w2 = random.choice(words), random.choice(words)
+                if len(w1) <= 1 or len(w2) <= 1:
+                    continue
+                args_text = '{} {}.'.format(w1, w2)
+
+                phi_data, window_data, kappa_data, stroke_data, coords = sample_text(sess, args_text, translation,
+                                                                                     style)
+                strokes = np.array(stroke_data)
+                strokes[:, :2] = np.cumsum(strokes[:, :2], axis=0)
+
+                fig, ax = plt.subplots(1, 1)
+                for stroke in split_strokes(cumsum(np.array(coords))):
+                    plt.plot(stroke[:, 0], -stroke[:, 1])
+                # ax.set_title('Handwriting')
+                ax.set_aspect('equal')
+                ax.set_axis_off()
+                plt.savefig('{}/{}.png'.format(data_dir, uuid.uuid4()), bbox_inches='tight', pad_inches=0)
+                # plt.show()
+                plt.close(fig)
+                record.append((idx, args_text))
+                idx += 1
+                pbar.update(1)
+
+                if idx % 100 == 0:
+                    write_record(record)
+        write_record(record)
 
 
 if __name__ == '__main__':
