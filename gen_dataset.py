@@ -126,7 +126,7 @@ def main():
     charset = [rev_translation[i] for i in range(len(rev_translation))]
     charset[0] = ''
 
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.3)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.15)
     config = tf.ConfigProto(
         device_count={'GPU': 1},
         gpu_options=gpu_options
@@ -152,12 +152,14 @@ def main():
             style = [styles[0][args.style], styles[1][args.style]]
 
         data_dir = 'gen'
-
+        gt_dir = 'gt'
         if not os.path.isdir(data_dir):
             os.makedirs(data_dir)
+        if not os.path.isdir(gt_dir):
+            os.makedirs(gt_dir)
 
         idx = 0
-        record_file = 'logs/{}.txt'.format(uuid.uuid4())
+        record_file = '{}/{}.txt'.format(gt_dir, uuid.uuid4())
 
         def write_record(record_list):
             with open(record_file, 'a') as res:
@@ -185,14 +187,15 @@ def main():
                 # ax.set_title('Handwriting')
                 ax.set_aspect('equal')
                 ax.set_axis_off()
-                plt.savefig('{}/{}.png'.format(data_dir, uuid.uuid4()), bbox_inches='tight', pad_inches=0)
+                id_ = uuid.uuid4()
+                plt.savefig('{}/{}.png'.format(data_dir, id_), bbox_inches='tight', pad_inches=0)
                 # plt.show()
                 plt.close(fig)
-                record.append((idx, args_text))
+                record.append((id_, args_text))
                 idx += 1
                 pbar.update(1)
 
-                if idx % 100 == 0:
+                if idx % 10 == 0:
                     write_record(record)
         write_record(record)
 
