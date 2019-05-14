@@ -126,7 +126,7 @@ def main():
     charset = [rev_translation[i] for i in range(len(rev_translation))]
     charset[0] = ''
 
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.15)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
     config = tf.ConfigProto(
         device_count={'GPU': 1},
         gpu_options=gpu_options
