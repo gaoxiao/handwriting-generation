@@ -8,7 +8,7 @@ BACKUP_file = os.path.join(gt_dir, 'ALL_bak')
 if os.path.isfile(ALL_file):
     shutil.copyfile(ALL_file, BACKUP_file)
 
-with open(ALL_file, 'a') as all:
+with open(ALL_file, 'w') as all:
     for gt_f in os.listdir(gt_dir):
         gt_f = os.path.join(gt_dir, gt_f)
         if not os.path.isfile(gt_f):
